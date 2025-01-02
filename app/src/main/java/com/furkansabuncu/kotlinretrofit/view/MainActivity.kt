@@ -2,6 +2,7 @@ package com.furkansabuncu.kotlinretrofit.view
 
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -77,5 +78,9 @@ class MainActivity : AppCompatActivity() , CryptoAdapter.Listener{
             }
 
         })
+    }
+
+    override fun onItemClick(cryptoModel: CryptoModel) {
+        Toast.makeText(this@MainActivity, "Buna tikladiniz $cryptoModel",Toast.LENGTH_LONG).show()
     }
 }
