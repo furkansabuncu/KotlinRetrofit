@@ -13,18 +13,28 @@ import com.furkansabuncu.kotlinretrofit.adapter.CryptoAdapter
 import com.furkansabuncu.kotlinretrofit.databinding.ActivityMainBinding
 import com.furkansabuncu.kotlinretrofit.model.CryptoModel
 import com.furkansabuncu.kotlinretrofit.service.CryptoAPI
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.schedulers.Schedulers
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
 
-class MainActivity : AppCompatActivity() , CryptoAdapter.Listener{
+class MainActivity : AppCompatActivity() , CryptoAdapter.Listener {
 
-    private val BASE_URL ="https://raw.githubusercontent.com/"
-    private var cryptoModels : ArrayList<CryptoModel>? = null
-    private var recyclerViewAdapter : CryptoAdapter? = null
-    lateinit var  binding : ActivityMainBinding
+    private val BASE_URL = "https://raw.githubusercontent.com/"
+    private var cryptoModels: ArrayList<CryptoModel>? = null
+    private var recyclerViewAdapter: CryptoAdapter? = null
+    lateinit var binding: ActivityMainBinding
+
+
+    //Disposable
+
+    private var compositeDisposable: CompositeDisposable? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,25 +43,32 @@ class MainActivity : AppCompatActivity() , CryptoAdapter.Listener{
         var view: View = binding.root
         setContentView(view)
 
+        compositeDisposable = CompositeDisposable()
 
         //https://deep-index.moralis.io/api/v2.2/market-data/global/market-cap
         //eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImZiMTMxMzhmLWY0MzEtNGIzMC04Y2NlLTQzNTE1ZTIxMjhmNyIsIm9yZ0lkIjoiNDIzNjg2IiwidXNlcklkIjoiNDM1NzQwIiwidHlwZUlkIjoiOWEyZTZiNjgtOGQ4YS00MTFjLWEzNzUtNTRjZTA3ZjgyNTdmIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MzU3Mjc3NDcsImV4cCI6NDg5MTQ4Nzc0N30.bs6vwjAdODOuDzPrh8XM6ZSPy1wNRxR-2Q_KG3JTzqg
 
-        val layoutManager : RecyclerView.LayoutManager = LinearLayoutManager(this)
-        binding.recyclerView.layoutManager=layoutManager
+        val layoutManager: RecyclerView.LayoutManager = LinearLayoutManager(this)
+        binding.recyclerView.layoutManager = layoutManager
 
 
         loadData()
     }
 
-    private fun loadData(){
+    private fun loadData() {
         val retrofit = Retrofit.Builder().baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
-            .build()
+            .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+            .build().create(CryptoAPI::class.java)
 
-        val service = retrofit.create(CryptoAPI::class.java)
-        val call = service.getData()
+        compositeDisposable?.add(
+            retrofit.getData().subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread()).subscribe(this::handleResponse)
+        )
 
+
+        /*
+          val service = retrofit.create(CryptoAPI::class.java)  
         call.enqueue(object: Callback<List<CryptoModel>>{
             override fun onResponse(
                 call: Call<List<CryptoModel>>,
@@ -78,9 +95,29 @@ class MainActivity : AppCompatActivity() , CryptoAdapter.Listener{
             }
 
         })
+        val call = service.getData()*/
+    }
+
+    private fun handleResponse(cryptoList: List<CryptoModel>) {
+        cryptoModels = ArrayList(cryptoList)
+
+        cryptoModels?.let {
+            recyclerViewAdapter = CryptoAdapter(it, this@MainActivity)
+            binding.recyclerView.adapter = recyclerViewAdapter
+
+        }
+
+
+
     }
 
     override fun onItemClick(cryptoModel: CryptoModel) {
-        Toast.makeText(this@MainActivity, "Buna tikladiniz $cryptoModel",Toast.LENGTH_LONG).show()
+        Toast.makeText(this@MainActivity, "Buna tikladiniz $cryptoModel", Toast.LENGTH_LONG)
+            .show()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        compositeDisposable?.clear()
     }
 }
